@@ -1,0 +1,13 @@
+services:
+  db:
+    container_name: its-a-secret
+    image: postgres:14.13
+    ports:
+      - 5432:5432
+    volumes:
+      - its-a-secret:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=123456
+
+volumes:
+  its-a-secret:
