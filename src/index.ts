@@ -67,11 +67,14 @@ io.on('connection', socket => {
         }
 
         socket.emit('user-checked', { isUserInRoom: !!playerExists });
-        socket.emit('joined-room', {
-            roomId: room.id,
-            players: room.players,
-            roomStatus: room.status,
-        });
+
+        if (playerExists) {
+            socket.emit('joined-room', {
+                roomId: room.id,
+                players: room.players,
+                roomStatus: room.status,
+            });
+        }
     });
 
     socket.on('join-room', payload => {
