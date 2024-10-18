@@ -4,20 +4,9 @@ import { Server } from 'socket.io';
 import { db } from './drizzle/db.js';
 import { players } from './drizzle/schema.js';
 import { eq } from 'drizzle-orm';
+import type { Room } from './interfaces/interfaces.js';
 
-interface Player {
-    id: string;
-    name: string;
-}
-
-interface Room {
-    id: string;
-    code: number;
-    players: Player[];
-}
-
-//rooms
-new Set();
+const rooms = new Map<string, Room>();
 
 const io = new Server(Number(process.env.PORT) ?? 3001, {
     cors: {
@@ -26,25 +15,68 @@ const io = new Server(Number(process.env.PORT) ?? 3001, {
 });
 
 io.on('connection', socket => {
-    socket.on('create-room', async () => {
-        const room = uuidv4();
+    socket.on('create-room', payload => {
+        const { username } = payload;
+        const roomId = uuidv4();
+        //8 digit code
+        let code = Math.floor(10000000 + Math.random() * 90000000).toString();
 
-        //insertar room en el set
-        /* id: room,
-        code: Math.floor(100000 + Math.random() * 900000) */
+        while (rooms.get(code)) {
+            code = Math.floor(10000000 + Math.random() * 90000000).toString();
+        }
 
+        const room: Room = {
+            id: roomId,
+            code,
+            players: [{ name: username, id: socket.id }],
+            status: 'waiting',
+        };
+
+        console.log('Code', room.code);
+        rooms.set(code, room);
+        socket.join(room.id);
         socket.emit('room-created', {
-            roomId: room,
+            roomId: roomId,
         });
     });
 
-    socket.on('join-room', async payload => {
-        const room = payload.roomId;
+    socket.on('enter-code', payload => {
+        const { code } = payload;
 
-        //añadir player al room en el set
-        await db.insert(players).values({
-            id: socket.id,
-            name: payload.name,
+        const room = rooms.get(code);
+
+        if (!room) {
+            //retornar un emit sendNotification
+            return `Room with code ${code} not found.`;
+        }
+
+        socket.emit('correct-code', { roomId: room.id });
+    });
+
+    socket.on('join-room', payload => {
+        const { code, username: playerName } = payload;
+
+        const room = rooms.get(code);
+
+        if (!room) {
+            return `Room with code ${code} not found.`;
+        }
+
+        const playerExists = room.players.find(({ id }) => id === socket.id);
+
+        if (!playerExists) {
+            room.players.push({
+                id: socket.id,
+                name: playerName,
+            });
+            socket.join(room.id);
+        }
+        console.log(room);
+        rooms.set(room.code, room);
+        socket.emit('joined-room', {
+            roomId: room.id,
+            players: room.players,
+            roomStatus: room.status,
         });
     });
 });
