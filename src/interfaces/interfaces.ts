@@ -1,7 +1,7 @@
 type status = 'waiting' | 'started';
 type role = 'Admin' | 'Player';
 
-interface Player {
+export interface Player {
     id: string;
     name?: string;
     role: role;

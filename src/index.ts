@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 import { db } from './drizzle/db.js';
 import { players } from './drizzle/schema.js';
 import { eq } from 'drizzle-orm';
-import type { Room } from './interfaces/interfaces.js';
+import type { Player, Room } from './interfaces/interfaces.js';
 
 const rooms = new Map<string, Room>();
 
@@ -24,10 +24,11 @@ io.on('connection', socket => {
             code = Math.floor(10000000 + Math.random() * 90000000).toString();
         }
 
+        const admin: Player = { id: socket.id, role: 'Admin' };
         const room: Room = {
             id: roomId,
             code,
-            players: [{ id: socket.id, role: 'Admin' }],
+            players: [admin],
             status: 'waiting',
         };
 
@@ -66,7 +67,7 @@ io.on('connection', socket => {
             return;
         }
 
-        socket.emit('user-checked', { isUserInRoom: !!playerExists });
+        socket.emit('user-checked', { isUserInRoom: !!playerExists, player: playerExists });
 
         if (playerExists) {
             socket.emit('joined-room', {
