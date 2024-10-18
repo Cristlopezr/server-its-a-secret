@@ -16,7 +16,6 @@ const io = new Server(Number(process.env.PORT) ?? 3001, {
 
 io.on('connection', socket => {
     socket.on('create-room', payload => {
-        const { username } = payload;
         const roomId = uuidv4();
         //8 digit code
         let code = Math.floor(10000000 + Math.random() * 90000000).toString();
@@ -28,15 +27,15 @@ io.on('connection', socket => {
         const room: Room = {
             id: roomId,
             code,
-            players: [{ name: username, id: socket.id }],
+            players: [],
             status: 'waiting',
         };
 
         console.log('Code', room.code);
         rooms.set(code, room);
-        socket.join(room.id);
         socket.emit('room-created', {
             roomId: roomId,
+            code,
         });
     });
 
@@ -50,11 +49,11 @@ io.on('connection', socket => {
             return `Room with code ${code} not found.`;
         }
 
-        socket.emit('correct-code', { roomId: room.id });
+        socket.emit('correct-code', { roomId: room.id, code });
     });
 
     socket.on('join-room', payload => {
-        const { code, username: playerName } = payload;
+        const { code, username: playerName, socketId } = payload;
 
         const room = rooms.get(code);
 
@@ -62,7 +61,7 @@ io.on('connection', socket => {
             return `Room with code ${code} not found.`;
         }
 
-        const playerExists = room.players.find(({ id }) => id === socket.id);
+        const playerExists = room.players.find(({ id }) => id === socketId);
 
         if (!playerExists) {
             room.players.push({
@@ -73,7 +72,7 @@ io.on('connection', socket => {
         }
         console.log(room);
         rooms.set(room.code, room);
-        socket.emit('joined-room', {
+        io.sockets.in(room.id).emit('joined-room', {
             roomId: room.id,
             players: room.players,
             roomStatus: room.status,
