@@ -24,12 +24,13 @@ io.on('connection', socket => {
             code = Math.floor(10000000 + Math.random() * 90000000).toString();
         }
 
-        const admin: Player = { id: socket.id, role: 'Admin' };
+        const admin: Player = { id: socket.id, role: 'Admin', score: 0 };
         const room: Room = {
             id: roomId,
             code,
             players: [admin],
             status: 'waiting',
+            secrets: [],
         };
 
         console.log('Code', room.code);
@@ -47,8 +48,9 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            //retornar un emit sendNotification
-            return `Room with code ${code} not found.`;
+            console.log('HERE');
+            socket.emit('send-notification', { message: "The game wasn't found" });
+            return;
         }
 
         socket.emit('correct-code', { roomId: room.id, code });
@@ -56,12 +58,15 @@ io.on('connection', socket => {
 
     socket.on('check-user-in-room', payload => {
         const { code, socketId } = payload;
+        console.log({ code, socketId });
         const room = rooms.get(code);
         if (!room) {
-            return `Room with code ${code} not found.`;
+            socket.emit('send-notification', { message: "The game wasn't found" });
+            return;
         }
         const playerExists = room.players.find(({ id }) => id === socketId);
 
+        console.log({ playerExists });
         if (playerExists?.role === 'Admin' && !playerExists.name) {
             socket.emit('user-checked', { isUserInRoom: false });
             return;
@@ -84,7 +89,8 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            return `Room with code ${code} not found.`;
+            socket.emit('send-notification', { message: "The game wasn't found" });
+            return;
         }
 
         const playerExists = room.players.find(({ id }) => id === socketId);
@@ -95,9 +101,10 @@ io.on('connection', socket => {
 
         if (!playerExists) {
             room.players.push({
-                id: socket.id,
+                id: socketId,
                 name: playerName,
                 role: 'Player',
+                score: 0,
             });
             socket.join(room.id);
         }
@@ -107,7 +114,7 @@ io.on('connection', socket => {
         io.sockets.in(room.id).emit('joined-room', {
             roomId: room.id,
             players: room.players,
-            roomStatus: room.status,
+            room: room,
         });
     });
 });
