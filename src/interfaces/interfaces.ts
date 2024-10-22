@@ -1,9 +1,9 @@
-type status = 'waiting' | 'started' | 'finished';
+type status = 'waitingPlayers' | 'waitingSecrets' | 'started' | 'finished';
 type role = 'Admin' | 'Player';
 
 export interface Player {
     id: string;
-    name?: string;
+    username?: string;
     role: role;
     score: number;
 }
@@ -14,10 +14,10 @@ export interface Room {
     status: status;
     players: Player[];
     secrets: Secret[];
+    maxPlayers: number;
 }
 
 interface Secret {
-    id: string;
     playerId: string;
     secret: string;
 }

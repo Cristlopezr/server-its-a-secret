@@ -1,12 +1,14 @@
 import 'dotenv/config';
 import { v4 as uuidv4 } from 'uuid';
-import { Server } from 'socket.io';
+import { Server, Socket, type DefaultEventsMap } from 'socket.io';
 import { db } from './drizzle/db.js';
 import { players } from './drizzle/schema.js';
 import { eq } from 'drizzle-orm';
 import type { Player, Room } from './interfaces/interfaces.js';
 
 const rooms = new Map<string, Room>();
+
+const MAX_PLAYERS = 4;
 
 const io = new Server(Number(process.env.PORT) ?? 3001, {
     cors: {
@@ -29,80 +31,40 @@ io.on('connection', socket => {
             id: roomId,
             code,
             players: [admin],
-            status: 'waiting',
+            status: 'waitingPlayers',
             secrets: [],
+            maxPlayers: MAX_PLAYERS,
         };
 
         console.log('Code', room.code);
         rooms.set(code, room);
         socket.join(room.id);
         socket.emit('room-created', {
-            roomId: roomId,
-            code,
+            room: room,
+            player: admin,
         });
     });
 
-    socket.on('enter-code', payload => {
-        const { code } = payload;
-
-        const room = rooms.get(code);
-
-        if (!room) {
-            console.log('HERE');
-            socket.emit('send-notification', { message: "The game wasn't found" });
-            return;
-        }
-
-        socket.emit('correct-code', { roomId: room.id, code });
-    });
-
-    socket.on('check-user-in-room', payload => {
-        const { code, socketId } = payload;
-        console.log({ code, socketId });
-        const room = rooms.get(code);
-        if (!room) {
-            socket.emit('send-notification', { message: "The game wasn't found" });
-            return;
-        }
-        const playerExists = room.players.find(({ id }) => id === socketId);
-
-        console.log({ playerExists });
-        if (playerExists?.role === 'Admin' && !playerExists.name) {
-            socket.emit('user-checked', { isUserInRoom: false });
-            return;
-        }
-
-        socket.emit('user-checked', { isUserInRoom: !!playerExists, player: playerExists });
-
-        if (playerExists) {
-            socket.emit('joined-room', {
-                roomId: room.id,
-                players: room.players,
-                roomStatus: room.status,
-            });
-        }
-    });
-
     socket.on('join-room', payload => {
-        const { code, username: playerName, socketId } = payload;
+        const { code, username } = payload;
 
         const room = rooms.get(code);
 
         if (!room) {
-            socket.emit('send-notification', { message: "The game wasn't found" });
+            sendNotification(socket, 'send-notification', "The game wasn't found");
             return;
         }
 
-        const playerExists = room.players.find(({ id }) => id === socketId);
+        const playerExists = room.players.find(({ id }) => id === socket.id);
 
-        if (playerExists?.role === 'Admin' && !playerExists.name) {
-            playerExists.name = playerName;
+        if (playerExists && !playerExists.username) {
+            playerExists.username = username;
         }
 
         if (!playerExists) {
             room.players.push({
-                id: socketId,
-                name: playerName,
+                id: socket.id,
+                username: username,
                 role: 'Player',
                 score: 0,
             });
@@ -112,9 +74,69 @@ io.on('connection', socket => {
         console.log(room);
         rooms.set(room.code, room);
         io.sockets.in(room.id).emit('joined-room', {
-            roomId: room.id,
-            players: room.players,
+            room: room,
+        });
+    });
+
+    socket.on('enter-code', payload => {
+        const { code } = payload;
+
+        const room = rooms.get(code);
+
+        if (!room) {
+            sendNotification(socket, 'send-notification', "The game wasn't found");
+            return;
+        }
+        const player: Player = { id: socket.id, role: 'Player', score: 0 };
+
+        room.players.push(player);
+        socket.join(room.id);
+        rooms.set(room.code, room);
+        socket.emit('correct-code', { room: room, player: player });
+    });
+
+    socket.on('reveal-secrets', payload => {
+        const { code } = payload;
+
+        const room = rooms.get(code);
+
+        if (!room) {
+            sendNotification(socket, 'send-notification', "The game wasn't found");
+            return;
+        }
+
+        room.status = 'waitingSecrets';
+
+        rooms.set(room.code, room);
+
+        io.sockets.in(room.id).emit('waiting-secrets', {
+            room: room,
+        });
+    });
+
+    socket.on('submit-secret', payload => {
+        const { code, secret } = payload;
+
+        const room = rooms.get(code);
+
+        if (!room) {
+            sendNotification(socket, 'send-notification', "The game wasn't found");
+            return;
+        }
+
+        room.secrets.push({
+            playerId: socket.id,
+            secret: secret,
+        });
+
+        rooms.set(room.code, room);
+
+        io.sockets.in(room.id).emit('secret-submitted', {
             room: room,
         });
     });
 });
+
+const sendNotification = (socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, event: string, notification: string) => {
+    socket.emit(event, { message: notification });
+};
