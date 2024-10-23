@@ -135,7 +135,74 @@ io.on('connection', socket => {
             room: room,
         });
     });
+
+    socket.on('game-starts', payload => {
+        const { code } = payload;
+
+        const room = rooms.get(code);
+
+        if (!room) {
+            sendNotification(socket, 'send-notification', "The game wasn't found");
+            return;
+        }
+
+        room.status = 'started';
+        room.secrets.sort(() => Math.random() - 0.5);
+
+        rooms.set(room.code, room);
+
+        io.sockets.in(room.id).emit('game-started', {
+            room: room,
+        });
+        createDelayTimer(room.id);
+    });
+
+    socket.on('new-round', payload => {
+        const { code } = payload;
+
+        const room = rooms.get(code);
+
+        if (!room) {
+            sendNotification(socket, 'send-notification', "The game wasn't found");
+            return;
+        }
+        createDelayTimer(room.id);
+    });
 });
+
+const createDelayTimer = (roomId: string) => {
+    let timeRemaining = 5;
+
+    const intervalId = setInterval(() => {
+        timeRemaining -= 1;
+        io.sockets.in(roomId).emit('delay-timer-update', {
+            time: timeRemaining,
+        });
+
+        if (timeRemaining <= 0) {
+            clearInterval(intervalId);
+            createRoundTimer(roomId);
+        }
+    }, 1000);
+};
+
+const createRoundTimer = (roomId: string) => {
+    let timeRemaining = 15;
+
+    const intervalId = setInterval(() => {
+        timeRemaining -= 1;
+        io.sockets.in(roomId).emit('timer-update', {
+            time: timeRemaining,
+        });
+
+        if (timeRemaining <= 0) {
+            clearInterval(intervalId);
+            io.sockets.in(roomId).emit('timer-ended', {
+                message: 'Time is up!',
+            });
+        }
+    }, 1000);
+};
 
 const sendNotification = (socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, event: string, notification: string) => {
     socket.emit(event, { message: notification });
