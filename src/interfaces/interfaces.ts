@@ -15,6 +15,7 @@ export interface Room {
     players: Player[];
     secrets: Secret[];
     maxPlayers: number;
+    currentSecretIdx: number;
 }
 
 interface Secret {

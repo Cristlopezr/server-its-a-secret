@@ -34,6 +34,7 @@ io.on('connection', socket => {
             status: 'waitingPlayers',
             secrets: [],
             maxPlayers: MAX_PLAYERS,
+            currentSecretIdx: 0,
         };
 
         console.log('Code', room.code);
@@ -154,51 +155,54 @@ io.on('connection', socket => {
         io.sockets.in(room.id).emit('game-started', {
             room: room,
         });
-        createDelayTimer(room.id);
+        createDelayTimer(room);
     });
 
     socket.on('new-round', payload => {
         const { code } = payload;
-
+        console.log('HERE');
         const room = rooms.get(code);
 
         if (!room) {
             sendNotification(socket, 'send-notification', "The game wasn't found");
             return;
         }
-        createDelayTimer(room.id);
+
+        createDelayTimer(room);
     });
 });
 
-const createDelayTimer = (roomId: string) => {
+const createDelayTimer = (room: Room) => {
     let timeRemaining = 5;
 
     const intervalId = setInterval(() => {
         timeRemaining -= 1;
-        io.sockets.in(roomId).emit('delay-timer-update', {
+        io.sockets.in(room.id).emit('delay-timer-update', {
             time: timeRemaining,
         });
 
         if (timeRemaining <= 0) {
             clearInterval(intervalId);
-            createRoundTimer(roomId);
+            createRoundTimer(room);
         }
     }, 1000);
 };
 
-const createRoundTimer = (roomId: string) => {
+const createRoundTimer = (room: Room) => {
     let timeRemaining = 15;
 
     const intervalId = setInterval(() => {
         timeRemaining -= 1;
-        io.sockets.in(roomId).emit('timer-update', {
-            time: timeRemaining,
-        });
 
-        if (timeRemaining <= 0) {
+        if (timeRemaining === 0) {
+            room.currentSecretIdx = room.currentSecretIdx + 1;
+            io.sockets.in(room.id).emit('time-is-up', { room: room });
+        } else if (timeRemaining <= -3) {
             clearInterval(intervalId);
-            io.sockets.in(roomId).emit('timer-ended', {
-                message: 'Time is up!',
+            io.sockets.in(room.id).emit('timer-ended');
+        } else {
+            io.sockets.in(room.id).emit('timer-update', {
+                time: timeRemaining,
             });
         }
     }, 1000);
