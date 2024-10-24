@@ -196,6 +196,9 @@ const createRoundTimer = (room: Room) => {
 
         if (timeRemaining === 0) {
             room.currentSecretIdx = room.currentSecretIdx + 1;
+            if (room.currentSecretIdx === room.secrets.length) {
+                room.status = 'finished';
+            }
             io.sockets.in(room.id).emit('time-is-up', { room: room });
         } else if (timeRemaining <= -3) {
             clearInterval(intervalId);
