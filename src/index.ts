@@ -4,7 +4,9 @@ import { Server, Socket, type DefaultEventsMap } from 'socket.io';
 import { db } from './drizzle/db.js';
 import { players } from './drizzle/schema.js';
 import { eq } from 'drizzle-orm';
-import type { Player, Room } from './interfaces/interfaces.js';
+import type { Player, Room } from './lib/interfaces/interfaces.js';
+import { getRandomItem } from './helpers/getRandomItem.js';
+import { colors, icons } from './lib/constants.js';
 
 const rooms = new Map<string, Room>();
 
@@ -26,7 +28,7 @@ io.on('connection', socket => {
             code = Math.floor(10000000 + Math.random() * 90000000).toString();
         }
 
-        const admin: Player = { id: socket.id, role: 'Admin', score: 0 };
+        const admin: Player = { id: socket.id, role: 'Admin', score: 0, icon: getRandomItem(icons)!, color: getRandomItem(colors)! };
         const room: Room = {
             id: roomId,
             code,
@@ -68,6 +70,8 @@ io.on('connection', socket => {
                 username: username,
                 role: 'Player',
                 score: 0,
+                color: getRandomItem(colors)!,
+                icon: getRandomItem(icons)!,
             });
             socket.join(room.id);
         }
@@ -88,7 +92,7 @@ io.on('connection', socket => {
             sendNotification(socket, 'send-notification', "The game wasn't found");
             return;
         }
-        const player: Player = { id: socket.id, role: 'Player', score: 0 };
+        const player: Player = { id: socket.id, role: 'Player', score: 0, color: getRandomItem(colors)!, icon: getRandomItem(icons)! };
 
         room.players.push(player);
         socket.join(room.id);
