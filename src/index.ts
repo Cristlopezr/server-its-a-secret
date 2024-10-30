@@ -5,7 +5,7 @@ import { db } from './drizzle/db.js';
 import { players } from './drizzle/schema.js';
 import { eq } from 'drizzle-orm';
 import type { Player, Room } from './lib/interfaces/interfaces.js';
-import { getRandomItem } from './helpers/getRandomItem.js';
+import { getRandomItem, getRandomUnusedItem } from './helpers/getRandomItem.js';
 import { colors, icons } from './lib/constants.js';
 
 const rooms = new Map<string, Room>();
@@ -64,14 +64,17 @@ io.on('connection', socket => {
             playerExists.username = username;
         }
 
+        const usedIcons = room.players.map(player => player.icon);
+        const usedColors = room.players.map(player => player.color);
+
         if (!playerExists) {
             room.players.push({
                 id: socket.id,
                 username: username,
                 role: 'Player',
                 score: 0,
-                color: getRandomItem(colors)!,
-                icon: getRandomItem(icons)!,
+                color: getRandomUnusedItem(usedIcons, colors),
+                icon: getRandomUnusedItem(usedColors, icons),
             });
             socket.join(room.id);
         }
@@ -92,7 +95,9 @@ io.on('connection', socket => {
             sendNotification(socket, 'send-notification', "The game wasn't found");
             return;
         }
-        const player: Player = { id: socket.id, role: 'Player', score: 0, color: getRandomItem(colors)!, icon: getRandomItem(icons)! };
+        const usedIcons = room.players.map(player => player.icon);
+        const usedColors = room.players.map(player => player.color);
+        const player: Player = { id: socket.id, role: 'Player', score: 0, color: getRandomUnusedItem(usedColors, colors), icon: getRandomUnusedItem(usedIcons, icons) };
 
         room.players.push(player);
         socket.join(room.id);
