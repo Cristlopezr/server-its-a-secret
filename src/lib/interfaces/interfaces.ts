@@ -20,6 +20,7 @@ export interface Room {
     secrets: Secret[];
     maxPlayers: number;
     currentSecretIdx: number;
+    roundStartTime?:number;
 }
 
 interface Secret {

@@ -3,12 +3,15 @@ import { v4 as uuidv4 } from 'uuid';
 import { Server, Socket, type DefaultEventsMap } from 'socket.io';
 import { db } from './drizzle/db.js';
 import { players } from './drizzle/schema.js';
-import { eq } from 'drizzle-orm';
+import { entityKind, eq } from 'drizzle-orm';
 import type { Player, Room } from './lib/interfaces/interfaces.js';
 import { getRandomItem, getRandomUnusedItem } from './helpers/getRandomItem.js';
 import { colors, icons } from './lib/constants.js';
 
 const rooms = new Map<string, Room>();
+
+const MAX_POINTS = 1000;
+const MAX_TIME = 15000;
 
 const MAX_PLAYERS = 4;
 
@@ -39,7 +42,6 @@ io.on('connection', socket => {
             currentSecretIdx: 0,
         };
 
-        console.log('Code', room.code);
         rooms.set(code, room);
         socket.join(room.id);
         socket.emit('room-created', {
@@ -79,7 +81,6 @@ io.on('connection', socket => {
             socket.join(room.id);
         }
 
-        console.log(room);
         rooms.set(room.code, room);
         io.sockets.in(room.id).emit('joined-room', {
             room: room,
@@ -169,15 +170,34 @@ io.on('connection', socket => {
 
     socket.on('new-round', payload => {
         const { code } = payload;
-        console.log('HERE');
         const room = rooms.get(code);
 
         if (!room) {
             sendNotification(socket, 'send-notification', "The game wasn't found");
             return;
         }
-
         createDelayTimer(room);
+    });
+
+    socket.on('user-voted', payload => {
+        const room = rooms.get(payload.code);
+
+        if (!room) {
+            sendNotification(socket, 'send-notification', "The game wasn't found");
+            return;
+        }
+
+        const timeTaken = payload.endTime - room.roundStartTime!;
+
+        const points = Math.max(0, MAX_POINTS - Math.floor((timeTaken / MAX_TIME) * MAX_POINTS));
+
+        const player = room.players.find(({ id }) => id === socket.id);
+
+        //!TODO:Retornar error
+        if (!player) return;
+        player.score += points;
+        rooms.set(room.code, room);
+        io.sockets.in(room.id).emit('updated-points', { room });
     });
 });
 
@@ -192,6 +212,7 @@ const createDelayTimer = (room: Room) => {
 
         if (timeRemaining <= 0) {
             clearInterval(intervalId);
+            room.roundStartTime = Date.now();
             createRoundTimer(room);
         }
     }, 1000);
