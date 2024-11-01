@@ -82,7 +82,8 @@ io.on('connection', socket => {
         }
 
         rooms.set(room.code, room);
-        io.sockets.in(room.id).emit('joined-room', {
+        socket.emit('joined-room')
+        io.sockets.in(room.id).emit('update-users-in-room', {
             room: room,
         });
     });
