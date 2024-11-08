@@ -82,7 +82,7 @@ io.on('connection', socket => {
         }
 
         rooms.set(room.code, room);
-        socket.emit('joined-room')
+        socket.emit('joined-room');
         io.sockets.in(room.id).emit('update-users-in-room', {
             room: room,
         });
@@ -166,6 +166,7 @@ io.on('connection', socket => {
         io.sockets.in(room.id).emit('game-started', {
             room: room,
         });
+        io.sockets.in(room.id).emit('round-waiting');
         createDelayTimer(room);
     });
 
@@ -177,6 +178,7 @@ io.on('connection', socket => {
             sendNotification(socket, 'send-notification', "The game wasn't found");
             return;
         }
+        io.sockets.in(room.id).emit('round-waiting');
         createDelayTimer(room);
     });
 
@@ -215,6 +217,7 @@ const createDelayTimer = (room: Room) => {
             clearInterval(intervalId);
             room.roundStartTime = Date.now();
             createRoundTimer(room);
+            io.sockets.in(room.id).emit('round-starts');
         }
     }, 1000);
 };
