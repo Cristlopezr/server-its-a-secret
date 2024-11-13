@@ -1,4 +1,4 @@
-import 'dotenv/config';
+/* import 'dotenv/config';
 import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 
@@ -7,3 +7,4 @@ const pool = new pg.Pool({
 });
 
 export const db = drizzle(pool);
+ */

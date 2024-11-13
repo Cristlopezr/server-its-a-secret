@@ -3,12 +3,11 @@ export function getRandomItem<T>(array: T[]): T | undefined {
     return array[randomIndex];
 }
 
-export function getRandomUnusedItem<T>(itemsInUse: string[], allItems: string[]): string {
-    // Filter items not in use
+export function getRandomUnusedItem(itemsInUse: string[], allItems: string[]): string {
     const unusedItems = allItems.filter(item => !itemsInUse.includes(item));
 
     if (unusedItems.length === 0) {
-        return allItems[0]!; // or any default value
+        return allItems[0]!;
     }
 
     let randomIndex = Math.floor(Math.random() * unusedItems.length);

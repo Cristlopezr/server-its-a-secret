@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm';
+/* import { relations } from 'drizzle-orm';
 import { uuid, pgTable, integer, varchar, timestamp, primaryKey, serial } from 'drizzle-orm/pg-core';
 
 export const games = pgTable('game', {
@@ -84,3 +84,4 @@ export const gamesToOptionsRelations = relations(gamesToOptions, ({ one }) => ({
         references: [options.id],
     }),
 }));
+ */

@@ -1,9 +1,9 @@
 import 'dotenv/config';
+/* import { db } from './drizzle/db.js';
+import { players } from './drizzle/schema.js';
+import { entityKind, eq } from 'drizzle-orm'; */
 import { v4 as uuidv4 } from 'uuid';
 import { Server, Socket, type DefaultEventsMap } from 'socket.io';
-import { db } from './drizzle/db.js';
-import { players } from './drizzle/schema.js';
-import { entityKind, eq } from 'drizzle-orm';
 import type { Player, Room } from './lib/interfaces/interfaces.js';
 import { getRandomItem, getRandomUnusedItem } from './helpers/getRandomItem.js';
 import { colors, icons } from './lib/constants.js';
@@ -83,7 +83,7 @@ io.on('connection', socket => {
 
         rooms.set(room.code, room);
         socket.emit('joined-room');
-        io.sockets.in(room.id).emit('update-users-in-room', {
+        io.to(room.id).emit('update-users-in-room', {
             room: room,
         });
     });
@@ -121,7 +121,7 @@ io.on('connection', socket => {
 
         rooms.set(room.code, room);
 
-        io.sockets.in(room.id).emit('waiting-secrets', {
+        io.to(room.id).emit('waiting-secrets', {
             room: room,
         });
     });
@@ -143,7 +143,7 @@ io.on('connection', socket => {
 
         rooms.set(room.code, room);
 
-        io.sockets.in(room.id).emit('secret-submitted', {
+        io.to(room.id).emit('secret-submitted', {
             room: room,
         });
     });
@@ -163,10 +163,10 @@ io.on('connection', socket => {
 
         rooms.set(room.code, room);
 
-        io.sockets.in(room.id).emit('game-started', {
+        io.to(room.id).emit('game-started', {
             room: room,
         });
-        io.sockets.in(room.id).emit('round-waiting');
+        io.to(room.id).emit('round-waiting');
         createDelayTimer(room);
     });
 
@@ -178,7 +178,7 @@ io.on('connection', socket => {
             sendNotification(socket, 'send-notification', "The game wasn't found");
             return;
         }
-        io.sockets.in(room.id).emit('round-waiting');
+        io.to(room.id).emit('round-waiting');
         createDelayTimer(room);
     });
 
@@ -200,7 +200,7 @@ io.on('connection', socket => {
         if (!player) return;
         player.score += points;
         rooms.set(room.code, room);
-        io.sockets.in(room.id).emit('updated-points', { room });
+        io.to(room.id).emit('updated-points', { room });
     });
 });
 
@@ -209,7 +209,7 @@ const createDelayTimer = (room: Room) => {
 
     const intervalId = setInterval(() => {
         timeRemaining -= 1;
-        io.sockets.in(room.id).emit('delay-timer-update', {
+        io.to(room.id).emit('delay-timer-update', {
             time: timeRemaining,
         });
 
@@ -217,7 +217,7 @@ const createDelayTimer = (room: Room) => {
             clearInterval(intervalId);
             room.roundStartTime = Date.now();
             createRoundTimer(room);
-            io.sockets.in(room.id).emit('round-starts');
+            io.to(room.id).emit('round-starts');
         }
     }, 1000);
 };
@@ -233,12 +233,12 @@ const createRoundTimer = (room: Room) => {
             if (room.currentSecretIdx === room.secrets.length) {
                 room.status = 'finished';
             }
-            io.sockets.in(room.id).emit('time-is-up', { room: room });
+            io.to(room.id).emit('time-is-up', { room: room });
         } else if (timeRemaining <= -3) {
             clearInterval(intervalId);
-            io.sockets.in(room.id).emit('timer-ended');
+            io.to(room.id).emit('timer-ended');
         } else {
-            io.sockets.in(room.id).emit('timer-update', {
+            io.to(room.id).emit('timer-update', {
                 time: timeRemaining,
             });
         }
