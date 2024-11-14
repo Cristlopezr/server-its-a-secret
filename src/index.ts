@@ -17,7 +17,7 @@ const MAX_PLAYERS = 4;
 
 const io = new Server(Number(process.env.PORT) ?? 3001, {
     cors: {
-        origin: ['http://localhost:3000'],
+        origin: [process.env.APP_URL as string],
     },
 });
 
