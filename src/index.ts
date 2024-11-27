@@ -22,6 +22,36 @@ const io = new Server(Number(process.env.PORT) ?? 3001, {
 });
 
 io.on('connection', socket => {
+    socket.on('disconnect', () => {
+        for (const room of rooms.values()) {
+            const disconnectedPlayer = room.players.find(player => player.id === socket.id);
+            if (disconnectedPlayer) {
+                socket.leave(room.id);
+
+                // Check if disconnected player was admin
+                if (disconnectedPlayer.role === 'Admin' && room.players.length > 1) {
+                    // Assign admin role to next player
+                    const nextPlayer = room.players.find(player => player.id !== socket.id);
+                    if (nextPlayer) {
+                        nextPlayer.role = 'Admin';
+                    }
+                }
+
+                // Remove disconnected player
+                room.players = room.players.filter(player => player.id !== socket.id);
+
+                // Delete room if empty
+                if (room.players.length === 0) {
+                    rooms.delete(room.code);
+                }
+
+                break;
+            }
+        }
+
+        console.log(rooms);
+    });
+
     socket.on('create-room', payload => {
         const roomId = uuidv4();
         //8 digit code
@@ -81,7 +111,6 @@ io.on('connection', socket => {
             socket.join(room.id);
         }
 
-        rooms.set(room.code, room);
         socket.emit('joined-room');
         io.to(room.id).emit('update-users-in-room', {
             room: room,
@@ -103,7 +132,6 @@ io.on('connection', socket => {
 
         room.players.push(player);
         socket.join(room.id);
-        rooms.set(room.code, room);
         socket.emit('correct-code', { room: room, player: player });
     });
 
@@ -118,8 +146,6 @@ io.on('connection', socket => {
         }
 
         room.status = 'waitingSecrets';
-
-        rooms.set(room.code, room);
 
         io.to(room.id).emit('waiting-secrets', {
             room: room,
@@ -141,8 +167,6 @@ io.on('connection', socket => {
             secret: secret,
         });
 
-        rooms.set(room.code, room);
-
         io.to(room.id).emit('secret-submitted', {
             room: room,
         });
@@ -160,8 +184,6 @@ io.on('connection', socket => {
 
         room.status = 'started';
         room.secrets.sort(() => Math.random() - 0.5);
-
-        rooms.set(room.code, room);
 
         io.to(room.id).emit('game-started', {
             room: room,
@@ -199,7 +221,6 @@ io.on('connection', socket => {
         //!TODO:Retornar error
         if (!player) return;
         player.score += points;
-        rooms.set(room.code, room);
         io.to(room.id).emit('updated-points', { room });
     });
 });
