@@ -86,7 +86,7 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "The game wasn't found");
+            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
 
@@ -123,7 +123,7 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "The game wasn't found");
+            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
         const usedIcons = room.players.map(player => player.icon);
@@ -141,7 +141,7 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "The game wasn't found");
+            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
 
@@ -158,7 +158,7 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "The game wasn't found");
+            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
 
@@ -178,7 +178,7 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "The game wasn't found");
+            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
 
@@ -197,7 +197,7 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "The game wasn't found");
+            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
         io.to(room.id).emit('round-waiting');
@@ -208,7 +208,7 @@ io.on('connection', socket => {
         const room = rooms.get(payload.code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "The game wasn't found");
+            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
 
