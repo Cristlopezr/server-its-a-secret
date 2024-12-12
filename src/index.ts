@@ -48,11 +48,9 @@ io.on('connection', socket => {
                 break;
             }
         }
-
-        console.log(rooms);
     });
 
-    socket.on('create-room', payload => {
+    socket.on('create-room', (payload, callback) => {
         const roomId = uuidv4();
         //8 digit code
         let code = Math.floor(10000000 + Math.random() * 90000000).toString();
@@ -72,6 +70,9 @@ io.on('connection', socket => {
             currentSecretIdx: 0,
         };
 
+        callback({
+            ok: true,
+        });
         rooms.set(code, room);
         socket.join(room.id);
         socket.emit('room-created', {
@@ -80,13 +81,13 @@ io.on('connection', socket => {
         });
     });
 
-    socket.on('join-room', payload => {
+    socket.on('join-room', (payload, callback) => {
         const { code, username } = payload;
 
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "Oops! Room not found");
+            callback({ message: 'Oops! Room not found', ok: false });
             return;
         }
 
@@ -110,20 +111,22 @@ io.on('connection', socket => {
             });
             socket.join(room.id);
         }
-
+        callback({
+            ok: true,
+        });
         socket.emit('joined-room');
         io.to(room.id).emit('update-users-in-room', {
             room: room,
         });
     });
 
-    socket.on('enter-code', payload => {
+    socket.on('enter-code', (payload, callback) => {
         const { code } = payload;
 
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "Oops! Room not found");
+            callback({ message: 'Oops! Room not found', ok: false });
             return;
         }
         const usedIcons = room.players.map(player => player.icon);
@@ -132,6 +135,9 @@ io.on('connection', socket => {
 
         room.players.push(player);
         socket.join(room.id);
+        callback({
+            ok: true,
+        });
         socket.emit('correct-code', { room: room, player: player });
     });
 
@@ -141,7 +147,6 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
 
@@ -158,7 +163,6 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
 
@@ -178,7 +182,6 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
 
@@ -197,7 +200,6 @@ io.on('connection', socket => {
         const room = rooms.get(code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
         io.to(room.id).emit('round-waiting');
@@ -208,7 +210,6 @@ io.on('connection', socket => {
         const room = rooms.get(payload.code);
 
         if (!room) {
-            sendNotification(socket, 'send-notification', "Oops! Room not found");
             return;
         }
 
@@ -254,7 +255,7 @@ const createRoundTimer = (room: Room) => {
             if (room.currentSecretIdx === room.secrets.length) {
                 room.status = 'finished';
             }
-            io.to(room.id).emit('time-is-up', { room: room });
+            io.to(room.id).emit('time-is-up', { status: room.status, currentSecretIdx: room.currentSecretIdx });
         } else if (timeRemaining <= -3) {
             clearInterval(intervalId);
             io.to(room.id).emit('timer-ended');
