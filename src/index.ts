@@ -50,7 +50,7 @@ io.on('connection', socket => {
         }
     });
 
-    socket.on('create-room', (payload, callback) => {
+    socket.on('create-room', (callback) => {
         const roomId = uuidv4();
         //8 digit code
         let code = Math.floor(10000000 + Math.random() * 90000000).toString();
