@@ -50,7 +50,7 @@ io.on('connection', socket => {
         }
     });
 
-    socket.on('create-room', (callback) => {
+    socket.on('create-room', callback => {
         const roomId = uuidv4();
         //8 digit code
         let code = Math.floor(10000000 + Math.random() * 90000000).toString();
@@ -70,14 +70,14 @@ io.on('connection', socket => {
             currentSecretIdx: 0,
         };
 
-        callback({
-            ok: true,
-        });
         rooms.set(code, room);
         socket.join(room.id);
         socket.emit('room-created', {
             room: room,
             player: admin,
+        });
+        callback({
+            ok: true,
         });
     });
 
@@ -88,6 +88,11 @@ io.on('connection', socket => {
 
         if (!room) {
             callback({ message: 'Oops! Room not found', ok: false });
+            return;
+        }
+
+        if (room.status !== 'waitingPlayers') {
+            callback({ message: "The game is already in progress and can't accept new players.", ok: false, type: 'game-started' });
             return;
         }
 
@@ -111,12 +116,13 @@ io.on('connection', socket => {
             });
             socket.join(room.id);
         }
-        callback({
-            ok: true,
-        });
+
         socket.emit('joined-room');
         io.to(room.id).emit('update-users-in-room', {
             room: room,
+        });
+        callback({
+            ok: true,
         });
     });
 
@@ -129,16 +135,22 @@ io.on('connection', socket => {
             callback({ message: 'Oops! Room not found', ok: false });
             return;
         }
+
+        if (room.status !== 'waitingPlayers') {
+            callback({ message: "The game is already in progress and can't accept new players.", ok: false });
+            return;
+        }
+
         const usedIcons = room.players.map(player => player.icon);
         const usedColors = room.players.map(player => player.color);
         const player: Player = { id: socket.id, role: 'Player', score: 0, color: getRandomUnusedItem(usedColors, colors), icon: getRandomUnusedItem(usedIcons, icons) };
 
         room.players.push(player);
         socket.join(room.id);
+        socket.emit('correct-code', { room: room, player: player });
         callback({
             ok: true,
         });
-        socket.emit('correct-code', { room: room, player: player });
     });
 
     socket.on('reveal-secrets', payload => {
@@ -195,16 +207,16 @@ io.on('connection', socket => {
         createDelayTimer(room);
     });
 
-    socket.on('new-round', payload => {
+    /*  socket.on('new-round', payload => {
         const { code } = payload;
         const room = rooms.get(code);
 
         if (!room) {
             return;
         }
-        io.to(room.id).emit('round-waiting');
+        
         createDelayTimer(room);
-    });
+    }); */
 
     socket.on('user-voted', payload => {
         const room = rooms.get(payload.code);
@@ -254,11 +266,16 @@ const createRoundTimer = (room: Room) => {
             room.currentSecretIdx = room.currentSecretIdx + 1;
             if (room.currentSecretIdx === room.secrets.length) {
                 room.status = 'finished';
+                clearInterval(intervalId);
+                io.to(room.id).emit('time-is-up', { status: room.status, currentSecretIdx: room.currentSecretIdx });
+                return;
             }
             io.to(room.id).emit('time-is-up', { status: room.status, currentSecretIdx: room.currentSecretIdx });
         } else if (timeRemaining <= -3) {
             clearInterval(intervalId);
             io.to(room.id).emit('timer-ended');
+            io.to(room.id).emit('round-waiting');
+            createDelayTimer(room);
         } else {
             io.to(room.id).emit('timer-update', {
                 time: timeRemaining,
