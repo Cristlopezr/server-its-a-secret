@@ -44,7 +44,7 @@ function parseCookie(str: string) {
 
 app.use(cookieParser());
 
-app.post('/api/session', (req, res) => {
+app.post('api/session', (req, res) => {
     let sessionId = req.cookies['its-a-secret-session'];
 
     if (!sessionId) {
