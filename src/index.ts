@@ -82,28 +82,28 @@ io.use((socket, next) => {
 io.on('connection', socket => {
     socket.on('disconnect', () => {
         for (const room of rooms.values()) {
-            const disconnectedPlayer = room.players.find(player => player.id === socket.id);
+            const disconnectedPlayer = room.players.find(player => player.id === socket.data.sessionId);
             if (disconnectedPlayer) {
                 socket.leave(room.id);
 
                 // Check if disconnected player was admin
                 if (disconnectedPlayer.role === 'Admin' && room.players.length > 1) {
                     // Assign admin role to next player
-                    const nextPlayer = room.players.find(player => player.id !== socket.id);
+                    const nextPlayer = room.players.find(player => player.id !== socket.data.sessionId);
                     if (nextPlayer) {
                         nextPlayer.role = 'Admin';
                     }
                 }
 
                 // Remove disconnected player
-                room.players = room.players.filter(player => player.id !== socket.id);
-
+                room.players = room.players.filter(player => player.id !== socket.data.sessionId);
+                io.to(room.id).emit('update-users-in-room', {
+                    room: room,
+                });
                 // Delete room if empty
                 if (room.players.length === 0) {
                     rooms.delete(room.code);
                 }
-
-                break;
             }
         }
     });
@@ -117,7 +117,7 @@ io.on('connection', socket => {
             code = Math.floor(100000 + Math.random() * 900000).toString();
         }
         const admin: Player = {
-            id: socket.id,
+            id: socket.data.sessionId,
             role: 'Admin',
             score: 0,
             icon: getRandomItem(icons)!,
@@ -133,6 +133,7 @@ io.on('connection', socket => {
             currentSecretIdx: 0,
         };
         rooms.set(code, room);
+        console.log({ roomsInCreateRoom: rooms });
         socket.join(room.id);
         socket.emit('room-created', {
             room: room,
@@ -162,7 +163,7 @@ io.on('connection', socket => {
             return;
         }
 
-        const playerExists = room.players.find(({ id }) => id === socket.id);
+        const playerExists = room.players.find(({ id }) => id === socket.data.sessionId);
 
         if (playerExists && !playerExists.username) {
             playerExists.username = username;
@@ -173,16 +174,15 @@ io.on('connection', socket => {
 
         if (!playerExists) {
             room.players.push({
-                id: socket.id,
+                id: socket.data.sessionId,
                 username: username,
                 role: 'Player',
                 score: 0,
                 color: getRandomUnusedItem(usedIcons, colors),
                 icon: getRandomUnusedItem(usedColors, icons),
             });
-            socket.join(room.id);
         }
-
+        socket.join(room.id);
         socket.emit('joined-room');
         io.to(room.id).emit('update-users-in-room', {
             room: room,
@@ -210,7 +210,7 @@ io.on('connection', socket => {
         const usedIcons = room.players.map(player => player.icon);
         const usedColors = room.players.map(player => player.color);
         const player: Player = {
-            id: socket.id,
+            id: socket.data.sessionId,
             role: 'Player',
             score: 0,
             color: getRandomUnusedItem(usedColors, colors),
@@ -251,7 +251,7 @@ io.on('connection', socket => {
         }
 
         room.secrets.push({
-            playerId: socket.id,
+            playerId: socket.data.sessionId,
             secret: secret,
         });
 
@@ -301,7 +301,7 @@ io.on('connection', socket => {
 
         const points = Math.max(0, MAX_POINTS - Math.floor((timeTaken / MAX_TIME) * MAX_POINTS));
 
-        const player = room.players.find(({ id }) => id === socket.id);
+        const player = room.players.find(({ id }) => id === socket.data.sessionId);
 
         //!TODO:Retornar error
         if (!player) return;
