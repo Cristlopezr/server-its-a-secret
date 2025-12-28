@@ -3,6 +3,10 @@ import 'dotenv/config';
 import { players } from './drizzle/schema.js';
 import { entityKind, eq } from 'drizzle-orm'; */
 import { v4 as uuidv4 } from 'uuid';
+import { createServer } from 'http';
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import cors from 'cors';
 import { Server, Socket, type DefaultEventsMap } from 'socket.io';
 import type { Player, Room } from './lib/interfaces/interfaces.js';
 import { getRandomItem, getRandomUnusedItem } from './helpers/getRandomItem.js';
@@ -15,10 +19,64 @@ const MAX_TIME = 15000;
 
 const MAX_PLAYERS = 4;
 
-const io = new Server(Number(process.env.PORT) ?? 3001, {
+const app = express();
+const httpServer = createServer(app);
+
+app.use(
+    cors({
+        origin: [process.env.APP_URL as string],
+        credentials: true,
+    })
+);
+
+function parseCookie(str: string) {
+    if (!str) {
+        return {};
+    }
+    return str.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.split('=').map(item => item.trim());
+        if (key && value) {
+            acc[key] = value;
+        }
+        return acc;
+    }, {} as Record<string, string>);
+}
+
+app.use(cookieParser());
+
+app.post('/api/session', (req, res) => {
+    let sessionId = req.cookies['its-a-secret-session'];
+
+    if (!sessionId) {
+        sessionId = uuidv4();
+        res.cookie('its-a-secret-session', sessionId, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000, // 1 day
+        });
+    }
+
+    res.json({ ok: true, message: 'Session created' });
+});
+
+const io = new Server(httpServer, {
     cors: {
         origin: [process.env.APP_URL as string],
+        credentials: true,
     },
+});
+
+io.use((socket, next) => {
+    const cookieHeader = socket?.handshake?.headers?.cookie || '';
+
+    const sessionId = parseCookie(cookieHeader)['its-a-secret-session'];
+
+    if (sessionId) {
+        socket.data.sessionId = sessionId;
+        return next();
+    }
+    return next(new Error('No session found'));
 });
 
 io.on('connection', socket => {
@@ -52,14 +110,19 @@ io.on('connection', socket => {
 
     socket.on('create-room', callback => {
         const roomId = uuidv4();
-        //8 digit code
-        let code = Math.floor(10000000 + Math.random() * 90000000).toString();
+        //6 digit code
+        let code = Math.floor(100000 + Math.random() * 900000).toString();
 
         while (rooms.get(code)) {
-            code = Math.floor(10000000 + Math.random() * 90000000).toString();
+            code = Math.floor(100000 + Math.random() * 900000).toString();
         }
-
-        const admin: Player = { id: socket.id, role: 'Admin', score: 0, icon: getRandomItem(icons)!, color: getRandomItem(colors)! };
+        const admin: Player = {
+            id: socket.id,
+            role: 'Admin',
+            score: 0,
+            icon: getRandomItem(icons)!,
+            color: getRandomItem(colors)!,
+        };
         const room: Room = {
             id: roomId,
             code,
@@ -69,7 +132,6 @@ io.on('connection', socket => {
             maxPlayers: MAX_PLAYERS,
             currentSecretIdx: 0,
         };
-
         rooms.set(code, room);
         socket.join(room.id);
         socket.emit('room-created', {
@@ -92,7 +154,11 @@ io.on('connection', socket => {
         }
 
         if (room.status !== 'waitingPlayers') {
-            callback({ message: "The game is already in progress and can't accept new players.", ok: false, type: 'game-started' });
+            callback({
+                message: "The game is already in progress and can't accept new players.",
+                ok: false,
+                type: 'game-started',
+            });
             return;
         }
 
@@ -143,7 +209,13 @@ io.on('connection', socket => {
 
         const usedIcons = room.players.map(player => player.icon);
         const usedColors = room.players.map(player => player.color);
-        const player: Player = { id: socket.id, role: 'Player', score: 0, color: getRandomUnusedItem(usedColors, colors), icon: getRandomUnusedItem(usedIcons, icons) };
+        const player: Player = {
+            id: socket.id,
+            role: 'Player',
+            score: 0,
+            color: getRandomUnusedItem(usedColors, colors),
+            icon: getRandomUnusedItem(usedIcons, icons),
+        };
 
         room.players.push(player);
         socket.join(room.id);
@@ -238,6 +310,11 @@ io.on('connection', socket => {
     });
 });
 
+const PORT = Number(process.env.PORT) ?? 3001;
+httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
+
 const createDelayTimer = (room: Room) => {
     let timeRemaining = 5;
 
@@ -284,6 +361,10 @@ const createRoundTimer = (room: Room) => {
     }, 1000);
 };
 
-const sendNotification = (socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>, event: string, notification: string) => {
+const sendNotification = (
+    socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, any>,
+    event: string,
+    notification: string
+) => {
     socket.emit(event, { message: notification });
 };
