@@ -131,9 +131,9 @@ io.on('connection', socket => {
             secrets: [],
             maxPlayers: MAX_PLAYERS,
             currentSecretIdx: 0,
+            scoresPublic: false,
         };
         rooms.set(code, room);
-        console.log({ roomsInCreateRoom: rooms });
         socket.join(room.id);
         socket.emit('room-created', {
             room: room,
@@ -306,7 +306,23 @@ io.on('connection', socket => {
         //!TODO:Retornar error
         if (!player) return;
         player.score += points;
-        io.to(room.id).emit('updated-points', { room });
+        io.to(room.id).emit('updated-points', { playerId: player.id, score: player.score });
+    });
+
+    socket.on('toggle-scores-public', payload => {
+        const { code } = payload;
+        const room = rooms.get(code);
+
+        if (!room) return;
+
+        const player = room.players.find(p => p.id === socket.data.sessionId);
+        if (!player || player.role !== 'Admin') return;
+
+        room.scoresPublic = !room.scoresPublic;
+
+        io.to(room.id).emit('update-users-in-room', {
+            room: room,
+        });
     });
 });
 

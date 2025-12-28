@@ -21,6 +21,7 @@ export interface Room {
     maxPlayers: number;
     currentSecretIdx: number;
     roundStartTime?:number;
+    scoresPublic: boolean;
 }
 
 interface Secret {
